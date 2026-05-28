@@ -70,8 +70,7 @@
       align-items: center;
       gap: 0; /* Stitched tightly side-by-side with no gap to represent 经折装 folding book */
       height: 82vh;
-      padding-left: 50vw; /* Center the first slide initially */
-      padding-right: 50vw;
+      /* padding-left and padding-right will be calculated dynamically on resize for perfect centering */
       transform-style: preserve-3d;
       will-change: transform;
     }
@@ -266,8 +265,7 @@
       /* Mobile optimization: Switch aspect ratio of panels to adapt portrait screens without cropping */
       .handscroll-ribbon {
         height: 75vh;
-        padding-left: 50vw;
-        padding-right: 50vw;
+        /* dynamic paddings are handled in JS resize */
       }
       .scroll-panel {
         /* On narrow mobile screens, restrict panel width to prevent overflow, keep aspect-ratio */
@@ -401,6 +399,15 @@
     function resize() {
       // Calculate dynamic ribbon length limits based on widths
       const panelWidth = panels[0].getBoundingClientRect().width;
+
+      // Dynamically calculate ribbon padding-left/right so first and last slides center perfectly
+      const halfViewport = window.innerWidth / 2;
+      const halfPanel = panelWidth / 2;
+      const padValue = halfViewport - halfPanel;
+
+      ribbon.style.paddingLeft = `${padValue}px`;
+      ribbon.style.paddingRight = `${padValue}px`;
+
       maxScroll = panelWidth * (panels.length - 1);
       targetX = Math.max(0, Math.min(targetX, maxScroll));
     }
