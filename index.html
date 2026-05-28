@@ -263,9 +263,59 @@
     body.flat-scroll .panel-card { border: none; box-shadow: 0 25px 65px rgba(0,0,0,0.5); }
 
     @media (max-width: 900px) {
-      .handscroll-ribbon { height: 42vh; }
-      .progress-bar { left: 5vw; right: 5vw; }
-      .status-hud, .controls-hint, .tweaks-toggle { display: none; }
+      /* Mobile optimization: Switch aspect ratio of panels to adapt portrait screens without cropping */
+      .handscroll-ribbon {
+        height: 75vh;
+        padding-left: 50vw;
+        padding-right: 50vw;
+      }
+      .scroll-panel {
+        /* On narrow mobile screens, restrict panel width to prevent overflow, keep aspect-ratio */
+        width: 82vw;
+        height: auto;
+        aspect-ratio: 16 / 9; /* Ensure 16:9/16:8 proportion is strictly maintained */
+      }
+      .panel-card img {
+        /* Smooth fitting for smaller screens */
+        object-fit: contain;
+      }
+      .progress-bar {
+        left: 8vw;
+        right: 8vw;
+        bottom: 25px;
+      }
+      .status-hud {
+        display: block !important;
+        left: 50% !important;
+        bottom: 38px !important;
+        transform: translateX(-50%);
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        white-space: nowrap;
+        background: rgba(7, 7, 9, 0.65);
+        padding: 4px 10px;
+        border-radius: 99px;
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(212, 175, 55, 0.1);
+        pointer-events: none;
+      }
+      .controls-hint {
+        display: block !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: 8px !important;
+        transform: translateX(-50%);
+        font-size: 9px;
+        opacity: 0.7;
+        letter-spacing: 0.1em;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      .panel-index {
+        font-size: 11px;
+        bottom: -24px;
+      }
+      .tweaks-toggle { display: none; }
     }
   </style>
 </head>
@@ -366,13 +416,16 @@
     // Touch support for trackpads & touch screens
     let touchStart = 0;
     window.addEventListener('touchstart', e => {
+      // Supporting multi-finger swipes or single swipes seamlessly
       touchStart = e.touches[0].clientX;
     }, { passive: true });
 
     window.addEventListener('touchmove', e => {
       const touchEnd = e.touches[0].clientX;
       const diff = touchStart - touchEnd;
-      targetX += diff * 1.5;
+      // Adjust movement sensitivity for smaller mobile screens
+      const sensitivity = window.innerWidth < 900 ? 1.0 : 1.5;
+      targetX += diff * sensitivity;
       targetX = Math.max(0, Math.min(targetX, maxScroll));
       touchStart = touchEnd;
     }, { passive: true });
