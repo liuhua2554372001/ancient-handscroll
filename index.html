@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>目录 · 经折装艺术手卷</title>
+  <style>
+    :root {
+      --bg-dark: #070709;
+      --gold-dim: rgba(181, 142, 78, 0.15);
+      --gold-bright: #d4af37;
+      --gold-soft: rgba(212, 175, 55, 0.45);
+      --crease-shadow: rgba(0, 0, 0, 0.68);
+      --card-shadow: rgba(0, 0, 0, 0.85);
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      /* Subtle noise pattern overlay & vignette */
+      background-image:
+        radial-gradient(circle at 50% 50%, rgba(31, 24, 16, 0.18) 0%, transparent 70%),
+        radial-gradient(circle at 50% 50%, transparent 30%, rgba(0,0,0,0.85) 100%);
+      font-family: ui-serif, Georgia, "Noto Serif SC", serif;
+      user-select: none;
+    }
+
+    /* Subtle canvas/paper background grain overlay */
+    .grain {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0.045;
+      background-image:
+        repeating-linear-gradient(90deg, #000 0 1px, transparent 1px 5px),
+        repeating-linear-gradient(0deg, #000 0 1px, transparent 1px 7px);
+      mix-blend-mode: multiply;
+    }
+
+    /* Ambient cursor-tracking lighting */
+    .lighting {
+      position: fixed;
+      inset: -20%;
+      pointer-events: none;
+      z-index: 2;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 45%), rgba(212, 175, 55, 0.08) 0%, rgba(0,0,0,0) 48%);
+    }
+
+    /* Horizon container */
+    .scroll-viewport {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      perspective: 2500px;
+      z-index: 10;
+    }
+
+    /* Continuous accordion folding track */
+    .handscroll-ribbon {
+      display: flex;
+      align-items: center;
+      gap: 0; /* Stitched tightly side-by-side with no gap to represent 经折装 folding book */
+      height: 60vh;
+      padding-left: 50vw; /* Center the first slide initially */
+      padding-right: 50vw;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* Individual panel/page folding unit */
+    .scroll-panel {
+      position: relative;
+      height: 100%;
+      aspect-ratio: 2 / 1; /* Match 16:8/2:1 wide ancient book page proportion */
+      flex-shrink: 0;
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      transform-origin: center center;
+    }
+
+    /* Real folding crease and dynamic lighting filters */
+    .scroll-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(0,0,0,0.42) 0%, transparent 6%, transparent 94%, rgba(0,0,0,0.52) 100%);
+      mix-blend-mode: multiply;
+    }
+
+    /* Panel Card Frame */
+    .panel-card {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #0f0d0a;
+      box-shadow:
+        0 35px 95px var(--card-shadow),
+        inset 0 0 50px rgba(0,0,0,0.85);
+      overflow: hidden;
+      transform: translate3d(0, 0, 0);
+      transition: box-shadow 0.4s ease, border-color 0.4s ease;
+      border-top: 1px solid rgba(212, 175, 55, 0.12);
+      border-bottom: 1px solid rgba(212, 175, 55, 0.12);
+    }
+
+    /* Fine subtle gold hairline border on active panels */
+    .scroll-panel.center-focus .panel-card {
+      border-top-color: var(--gold-soft);
+      border-bottom-color: var(--gold-soft);
+      box-shadow:
+        0 45px 110px rgba(0,0,0,0.95),
+        0 0 40px rgba(212, 175, 55, 0.05),
+        inset 0 0 50px rgba(0,0,0,0.7);
+    }
+
+    /* 4K Book Image containment */
+    .panel-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #100e0a;
+      filter: contrast(1.02) saturate(0.96) brightness(0.92);
+      transition: filter 0.5s ease;
+    }
+
+    .scroll-panel.center-focus img {
+      filter: contrast(1.02) saturate(0.98) brightness(1.02);
+    }
+
+    /* Elegant minimalist indicator tag */
+    .panel-index {
+      position: absolute;
+      bottom: -45px;
+      left: 50%;
+      transform: translateX(-50%) translate3d(0,0,20px);
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      color: rgba(212, 175, 55, 0.28);
+      font-family: monospace, sans-serif;
+      transition: color 0.4s ease, transform 0.4s ease;
+    }
+
+    .scroll-panel.center-focus .panel-index {
+      color: var(--gold-bright);
+      transform: translateX(-50%) translate3d(0, -5px, 30px);
+    }
+
+    /* Minimalist global progress slider (horizontal timeline track) */
+    .progress-bar {
+      position: fixed;
+      left: 10vw;
+      right: 10vw;
+      bottom: 50px;
+      height: 1px;
+      background: rgba(212, 175, 55, 0.08);
+      z-index: 50;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, var(--gold-soft), transparent);
+      transition: width 0.1s linear;
+    }
+
+    /* Quiet interactive status indicators */
+    .status-hud {
+      position: fixed;
+      left: 48px;
+      bottom: 40px;
+      z-index: 50;
+      font-size: 14px;
+      letter-spacing: 0.22em;
+      color: rgba(212, 175, 55, 0.45);
+      text-transform: uppercase;
+    }
+
+    .status-hud span {
+      color: var(--gold-bright);
+      font-weight: 600;
+    }
+
+    /* Discrete helper hint */
+    .controls-hint {
+      position: fixed;
+      right: 48px;
+      bottom: 40px;
+      z-index: 50;
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      color: rgba(212, 175, 55, 0.32);
+    }
+
+    /* Live styling tweaks toggle */
+    .tweaks-toggle {
+      position: fixed;
+      right: 48px;
+      top: 40px;
+      z-index: 150;
+      background: none;
+      border: 1px solid rgba(212, 175, 55, 0.16);
+      color: rgba(212, 175, 55, 0.6);
+      padding: 6px 14px;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.3s;
+    }
+
+    .tweaks-toggle:hover {
+      border-color: var(--gold-soft);
+      color: var(--gold-bright);
+      background: rgba(212, 175, 55, 0.04);
+    }
+
+    .tweaks-panel {
+      position: fixed;
+      right: 48px;
+      top: 86px;
+      z-index: 150;
+      width: 240px;
+      background: rgba(10, 8, 6, 0.92);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      backdrop-filter: blur(12px);
+      padding: 18px;
+      display: none;
+      color: rgba(212, 175, 55, 0.8);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.8);
+    }
+
+    .tweaks-panel.active { display: block; }
+    .tweak-title { font-size: 13px; font-weight: 600; color: var(--gold-bright); margin-bottom: 12px; letter-spacing: 0.05em; }
+    .tweak-row { margin-top: 10px; }
+    .tweak-row label { display: block; font-size: 11px; color: rgba(212, 175, 55, 0.5); margin-bottom: 4px; }
+    .tweak-row select, .tweak-row input {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(212, 175, 55, 0.15);
+      padding: 6px;
+      font-family: inherit;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    /* Flat theme override */
+    body.flat-scroll {
+      background-image: linear-gradient(180deg, #0a0a0c, #040405);
+    }
+    body.flat-scroll .scroll-panel::before { display: none; }
+    body.flat-scroll .panel-card { border: none; box-shadow: 0 25px 65px rgba(0,0,0,0.5); }
+
+    @media (max-width: 900px) {
+      .handscroll-ribbon { height: 42vh; }
+      .progress-bar { left: 5vw; right: 5vw; }
+      .status-hud, .controls-hint, .tweaks-toggle { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="lighting" id="lighting"></div>
+
+  <!-- Quiet indicators -->
+  <div class="status-hud">
+    图录 · <span id="hudIndex">01</span> / 24
+  </div>
+  <div class="controls-hint">
+    双指滑移 / 滚轮滚动 · 顺畅体验
+  </div>
+
+  <!-- Global Progress Tracker Line -->
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <!-- Horizontal Folding Book Viewport -->
+  <main class="scroll-viewport" id="viewport">
+    <div class="handscroll-ribbon" id="ribbon">
+      <!-- 24 16:8 Pages laid out sequentially with proper space URL-encoding -->
+      <div class="scroll-panel" data-index="0"><div class="panel-card"><img src="目录/1.png" alt=""></div><div class="panel-index">壹</div></div>
+      <div class="scroll-panel" data-index="1"><div class="panel-card"><img src="目录/2.png" alt=""></div><div class="panel-index">贰</div></div>
+      <div class="scroll-panel" data-index="2"><div class="panel-card"><img src="目录/3.png" alt=""></div><div class="panel-index">叁</div></div>
+      <div class="scroll-panel" data-index="3"><div class="panel-card"><img src="目录/4.png" alt=""></div><div class="panel-index">肆</div></div>
+      <div class="scroll-panel" data-index="4"><div class="panel-card"><img src="目录/5.png" alt=""></div><div class="panel-index">伍</div></div>
+      <div class="scroll-panel" data-index="5"><div class="panel-card"><img src="目录/6.png" alt=""></div><div class="panel-index">陆</div></div>
+      <div class="scroll-panel" data-index="6"><div class="panel-card"><img src="目录/7.png" alt=""></div><div class="panel-index">柒</div></div>
+      <div class="scroll-panel" data-index="7"><div class="panel-card"><img src="目录/8.png" alt=""></div><div class="panel-index">捌</div></div>
+      <div class="scroll-panel" data-index="8"><div class="panel-card"><img src="目录/9.png" alt=""></div><div class="panel-index">玖</div></div>
+      <div class="scroll-panel" data-index="9"><div class="panel-card"><img src="目录/10.png" alt=""></div><div class="panel-index">拾</div></div>
+      <div class="scroll-panel" data-index="10"><div class="panel-card"><img src="目录/11.png" alt=""></div><div class="panel-index">拾壹</div></div>
+      <div class="scroll-panel" data-index="11"><div class="panel-card"><img src="目录/12.png" alt=""></div><div class="panel-index">拾贰</div></div>
+      <div class="scroll-panel" data-index="12"><div class="panel-card"><img src="目录/13.png" alt=""></div><div class="panel-index">拾叁</div></div>
+      <div class="scroll-panel" data-index="13"><div class="panel-card"><img src="目录/14.png" alt=""></div><div class="panel-index">拾肆</div></div>
+      <div class="scroll-panel" data-index="14"><div class="panel-card"><img src="目录/15.png" alt=""></div><div class="panel-index">拾伍</div></div>
+      <div class="scroll-panel" data-index="15"><div class="panel-card"><img src="目录/16.png" alt=""></div><div class="panel-index">拾陆</div></div>
+      <div class="scroll-panel" data-index="16"><div class="panel-card"><img src="目录/17.png" alt=""></div><div class="panel-index">拾柒</div></div>
+      <div class="scroll-panel" data-index="17"><div class="panel-card"><img src="目录/18.png" alt=""></div><div class="panel-index">拾捌</div></div>
+      <div class="scroll-panel" data-index="18"><div class="panel-card"><img src="目录/19.png" alt=""></div><div class="panel-index">拾玖</div></div>
+      <div class="scroll-panel" data-index="19"><div class="panel-card"><img src="目录/20.png" alt=""></div><div class="panel-index">贰拾</div></div>
+      <div class="scroll-panel" data-index="20"><div class="panel-card"><img src="目录/21.png" alt=""></div><div class="panel-index">贰拾壹</div></div>
+      <div class="scroll-panel" data-index="21"><div class="panel-card"><img src="目录/22.png" alt=""></div><div class="panel-index">贰拾贰</div></div>
+      <div class="scroll-panel" data-index="22"><div class="panel-card"><img src="目录/23.png" alt=""></div><div class="panel-index">贰拾叁</div></div>
+      <div class="scroll-panel" data-index="23"><div class="panel-card"><img src="目录/终.png" alt=""></div><div class="panel-index">终章</div></div>
+    </div>
+  </main>
+
+  <button class="tweaks-toggle" onclick="toggleTweaks()">调校</button>
+  <div class="tweaks-panel" id="tweaksPanel">
+    <div class="tweak-title">经折装空间调优</div>
+    <div class="tweak-row">
+      <label>物理仿真模式</label>
+      <select onchange="updateTheme(this.value)">
+        <option value="classic">经折叠层 (3D Accordion)</option>
+        <option value="flat">现代画幅 (Flat Roll)</option>
+      </select>
+    </div>
+    <div class="tweak-row">
+      <label>折叠角度 (Y轴)</label>
+      <input type="range" min="0" max="18" value="9" id="foldAngle">
+    </div>
+    <div class="tweak-row">
+      <label>滑行惯性阻尼</label>
+      <input type="range" min="5" max="15" value="8" id="damping">
+    </div>
+  </div>
+
+  <script>
+    const ribbon = document.getElementById('ribbon');
+    const panels = Array.from(document.querySelectorAll('.scroll-panel'));
+    const fill = document.getElementById('progressFill');
+    const hudIndex = document.getElementById('hudIndex');
+
+    // Smooth inertia physics variables
+    let targetX = parseFloat(localStorage.getItem('handscrollTargetX') || '0');
+    let currentX = targetX;
+    let maxScroll = 0;
+
+    function resize() {
+      // Calculate dynamic ribbon length limits based on widths
+      const panelWidth = panels[0].getBoundingClientRect().width;
+      maxScroll = panelWidth * (panels.length - 1);
+      targetX = Math.max(0, Math.min(targetX, maxScroll));
+    }
+
+    // Kinesthetically smooth scroll wheel listener
+    window.addEventListener('wheel', e => {
+      e.preventDefault();
+      // Directly add wheel delta, no laggy cooldowns!
+      targetX += e.deltaY * 0.95;
+      targetX = Math.max(0, Math.min(targetX, maxScroll));
+    }, { passive: false });
+
+    // Touch support for trackpads & touch screens
+    let touchStart = 0;
+    window.addEventListener('touchstart', e => {
+      touchStart = e.touches[0].clientX;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', e => {
+      const touchEnd = e.touches[0].clientX;
+      const diff = touchStart - touchEnd;
+      targetX += diff * 1.5;
+      targetX = Math.max(0, Math.min(targetX, maxScroll));
+      touchStart = touchEnd;
+    }, { passive: true });
+
+    // Smooth physics RAF loop (60/120fps)
+    function loop() {
+      const dVal = parseInt(document.getElementById('damping').value || '8') / 100;
+      currentX += (targetX - currentX) * dVal;
+
+      // Translate ribbon smoothly
+      ribbon.style.transform = `translate3d(${-currentX.toFixed(2)}px, 0, 0)`;
+
+      // Dynamic folding perspective and crease shadows calculation
+      const viewportCenter = window.innerWidth / 2;
+      const fVal = parseInt(document.getElementById('foldAngle').value || '9');
+
+      let focusedIndex = 0;
+      let minDistance = Infinity;
+
+      panels.forEach((panel, i) => {
+        const rect = panel.getBoundingClientRect();
+        const panelCenter = rect.left + rect.width / 2;
+        const distanceToCenter = panelCenter - viewportCenter;
+
+        // Keep track of the panel closest to screen center
+        if (Math.abs(distanceToCenter) < minDistance) {
+          minDistance = Math.abs(distanceToCenter);
+          focusedIndex = i;
+        }
+
+        // Apply accordion-like 3D folding angles based on screen position
+        const foldDirection = distanceToCenter > 0 ? 1 : -1;
+        const offsetPercent = Math.min(Math.abs(distanceToCenter) / viewportCenter, 1.5);
+
+        // Dynamic fold logic representing accordion binding
+        const angleY = -foldDirection * offsetPercent * fVal;
+        const scale = 1 - (offsetPercent * 0.08);
+        const z = -Math.abs(distanceToCenter) * 0.15;
+
+        // Fold translation adjustment to simulate continuous accordion fold
+        const adjustX = foldDirection * offsetPercent * (rect.width * 0.05);
+
+        panel.style.transform = `translate3d(${adjustX.toFixed(2)}px, 0, ${z.toFixed(2)}px) rotateY(${angleY.toFixed(3)}deg) scale(${scale.toFixed(4)})`;
+        panel.style.opacity = (1.1 - offsetPercent * 0.55).toFixed(3);
+      });
+
+      // Update HUD and Progress
+      panels.forEach((p, idx) => {
+        p.classList.toggle('center-focus', idx === focusedIndex);
+      });
+
+      hudIndex.textContent = String(focusedIndex + 1).padStart(2, '0');
+      const pct = maxScroll ? (currentX / maxScroll) * 100 : 0;
+      fill.style.width = `${pct}%`;
+
+      // Persist state silently
+      localStorage.setItem('handscrollTargetX', targetX);
+
+      requestAnimationFrame(loop);
+    }
+
+    // Dynamic light tracking mouse coords
+    window.addEventListener('pointermove', event => {
+      document.body.style.setProperty('--mx', `${(event.clientX / window.innerWidth) * 100}%`);
+      document.body.style.setProperty('--my', `${(event.clientY / window.innerHeight) * 100}%`);
+    }, { passive: true });
+
+    // Handle settings panel
+    function toggleTweaks() {
+      document.getElementById('tweaksPanel').classList.toggle('active');
+    }
+
+    function updateTheme(mode) {
+      if (mode === 'flat') {
+        document.body.classList.add('flat-scroll');
+      } else {
+        document.body.classList.remove('flat-scroll');
+      }
+    }
+
+    window.addEventListener('resize', resize);
+    window.setTimeout(() => {
+      resize();
+      requestAnimationFrame(loop);
+    }, 150);
+  </script>
+</body>
+</html>

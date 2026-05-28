@@ -1,0 +1,11 @@
+# Folders to ignore
+node_modules/
+.claude/
+novel-encyclopedia-architect/
+novel-encyclopedia/
+novel-encyclopedia-architect.zip
+
+# Large archives or logs
+*.zip
+*.log
+*.tmp
